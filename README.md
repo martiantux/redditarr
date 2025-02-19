@@ -161,7 +161,7 @@ The web interface will be available at `http://localhost:8481`
 - Future support for deduplication
 
 ### Archival Strategy
-- Intelligent post selection (top 1000 all-time merged with top 1000 current)
+- Intelligent post selection (top 1000 all-time merged with current 1000 hot/popular)
 - Smart comment archival (top 500 comments per post with conversation context)
 - Prioritized media downloads (Reddit-hosted content first)
 - Natural traffic patterns through multiple simulated clients

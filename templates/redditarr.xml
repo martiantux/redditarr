@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>redditarr</Name>
+  <Repository>martiantux/redditarr</Repository>
+  <Registry>https://hub.docker.com/r/martiantux/redditarr/</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  
+  <Overview>Reddit media archival tool. Download and organize content from your favorite subreddits.</Overview>
+  <Category>Downloaders: MediaApp:Other</Category>
+  <WebUI>http://[IP]:[PORT:8481]</WebUI>
+  <Icon>https://raw.githubusercontent.com/martiantux/redditarr/main/static/icon.png</Icon>
+  
+  <Config Name="WebUI Port" Target="80" Default="8481" Mode="tcp" Description="Web UI Port. Default 8481, but can be changed to any port including 80 for direct web access." Type="Port" Display="always" Required="true">8481</Config>
+  
+  <Config Name="Media Storage" Target="/media" Default="/mnt/user/data/redditarr" Mode="rw" Description="Where downloaded media will be stored" Type="Path" Display="always" Required="true">/mnt/user/data/redditarr</Config>
+  
+  <Config Name="App Data" Target="/config" Default="/mnt/user/appdata/redditarr" Mode="rw" Description="Application data and database" Type="Path" Display="advanced" Required="true">/mnt/user/appdata/redditarr</Config>
+  
+  <Config Name="Reddit Client ID" Target="REDDIT_CLIENT_ID" Default="" Mode="" Description="Reddit API Client ID from https://www.reddit.com/prefs/apps" Type="Variable" Display="always" Required="true"></Config>
+  <Config Name="Reddit Client Secret" Target="REDDIT_CLIENT_SECRET" Default="" Mode="" Description="Reddit API Client Secret" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  <Config Name="Reddit Username" Target="REDDIT_USERNAME" Default="" Mode="" Description="Your Reddit username" Type="Variable" Display="always" Required="true"></Config>
+  <Config Name="Reddit Password" Target="REDDIT_PASSWORD" Default="" Mode="" Description="Your Reddit password" Type="Variable" Display="always" Required="true" Mask="true"></Config>
+  
+  <Config Name="Timezone" Target="TZ" Default="Etc/UTC" Mode="" Description="Container Timezone" Type="Variable" Display="advanced">Etc/UTC</Config>
+  
+  <DonateText>If you find this app useful, consider supporting its development!</DonateText>
+  <DonateLink>https://github.com/sponsors/martiantux</DonateLink>
+</Container>
