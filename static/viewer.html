@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <title>Redditarr - Viewer</title>
+        <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            .single-view-container {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: #000;
+                z-index: 50;
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+                height: 100dvh;
+            }
+    
+            .single-view-nav {
+                position: fixed;
+                top: env(safe-area-inset-top, 0);
+                left: 0;
+                right: 0;
+                height: 48px;
+                background: rgba(0, 0, 0, 0.8);
+                backdrop-filter: blur(8px);
+                z-index: 60;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 0 1rem;
+                color: white;
+                padding-top: env(safe-area-inset-top, 0);
+                padding-left: env(safe-area-inset-left, 1rem);
+                padding-right: env(safe-area-inset-right, 1rem);
+            }
+    
+            .single-view-post {
+                position: relative;
+                width: 100%;
+                height: 100vh;
+                height: 100dvh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                scroll-snap-align: start;
+                scroll-snap-stop: always;
+                contain: content;
+                will-change: transform;
+                padding-top: calc(48px + env(safe-area-inset-top, 0));
+                padding-bottom: env(safe-area-inset-bottom, 0);
+            }
+
+            .single-view-media {
+                width: 100%;
+                height: calc(100% - 140px);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0;
+            }
+
+            .single-view-info {
+                position: absolute;
+                bottom: env(safe-area-inset-bottom, 0);
+                left: env(safe-area-inset-left, 0);
+                right: env(safe-area-inset-right, 0);
+                padding: 2rem;
+                background: linear-gradient(transparent, rgba(0,0,0,0.8));
+                color: white;
+                padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0));
+                min-height: 140px;
+                z-index: 20;
+            }
+
+            .single-view-info .flex.items-center.space-x-4 {
+                margin-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0.5rem));
+            }
+    
+            .single-view-media img,
+            .single-view-media video {
+                max-width: 100%;
+                max-height: 100%;
+                object-fit: contain;
+                -webkit-transform: translateZ(0);
+                transform: translateZ(0);
+                backface-visibility: hidden;
+                will-change: transform;
+            }
+    
+            .single-view-viewport {
+                height: 100%;
+                height: 100dvh;
+                overflow-y: scroll;
+                scroll-snap-type: y mandatory;
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior-y: contain;
+                scrollbar-width: none;
+            }
+    
+            .single-view-viewport::-webkit-scrollbar {
+                display: none;
+            }
+    
+            .container.single-view-active > *:not(#content-container) {
+                display: none;
+            }
+    
+            .single-view-nav select {
+                background-color: rgba(0, 0, 0, 0.5);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+                color: white;
+            }
+    
+            .single-view-nav select option {
+                background-color: #000;
+                color: white;
+            }
+    
+            .video-container {
+                position: relative;
+                cursor: pointer;
+            }
+    
+            .video-controls {
+                z-index: 20;
+                transition: opacity 0.2s;
+                background: linear-gradient(transparent, rgba(0,0,0,0.3));
+                padding-top: 2rem;
+            }
+    
+            .video-container:hover .video-controls {
+                opacity: 1;
+            }
+    
+            .loading-indicator {
+                position: absolute;
+                inset: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(0, 0, 0, 0.4);
+                transition: opacity 0.2s;
+            }
+    
+            .video-container.loaded .loading-indicator {
+                opacity: 0;
+                pointer-events: none;
+            }
+    
+            .play-indicator {
+                z-index: 10;
+                pointer-events: none;
+            }
+    
+            .audio-toggle {
+                cursor: pointer;
+                background: rgba(0, 0, 0, 0.5);
+                padding: 0.5rem;
+                border-radius: 50%;
+                transition: all 0.2s;
+            }
+    
+            .audio-toggle:hover {
+                background: rgba(0, 0, 0, 0.7);
+            }
+    
+            @media (max-width: 768px) {
+                .single-view-info {
+                    font-size: 0.9rem;
+                }
+    
+                .video-controls {
+                    opacity: 1;
+                }
+            }
+        </style>
+    </head>
+
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Subreddit Header -->
+        <div class="bg-white p-4 mb-4 rounded-lg shadow">
+            <div class="flex justify-between items-center">
+                <h2 id="current-subreddit" class="text-2xl font-bold"></h2>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <label class="text-sm text-gray-600">View:</label>
+                        <select id="view-mode" class="rounded border px-2 py-1">
+                            <option value="reddit">Reddit Style</option>
+                            <option value="single">Single View</option>
+                            <option value="grid">Grid View</option>
+                        </select>
+                        <label class="text-sm text-gray-600">Sort:</label>
+                        <select id="sort-type" class="rounded border px-2 py-1">
+                            <option value="score">Top Votes</option>
+                            <option value="new">Newest First</option>
+                            <option value="random">Random</option>
+                        </select>
+                    </div>
+                    <a href="/" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded">Back to Library</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Container -->
+        <div id="content-container"></div>
+    </div>
+
+    <script src="/static/js/viewer.js"></script>
+</body>
+</html>

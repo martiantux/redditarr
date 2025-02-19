@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redditarr</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <!-- Setup Overlay -->
+    <div id="setupOverlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-lg shadow-xl text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <h2 class="text-xl font-semibold mb-2">Setting Up Redditarr</h2>
+            <p id="setupStatus" class="text-gray-600">Initializing...</p>
+            <div id="setupDetails" class="mt-4 text-sm text-gray-500">
+                <p><span id="dbStatus">⌛</span> Database Initialization</p>
+                <p><span id="nsfwStatus">⌛</span> Loading Subreddit List</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="mainContent" class="container mx-auto px-4 py-8 hidden">
+        <!-- Main View -->
+        <div id="main-view">
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold mb-8">Redditarr</h1>
+                
+                <!-- Stats Section -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h3 class="text-sm text-gray-600">Monitored Subreddits</h3>
+                        <p class="text-2xl font-semibold" id="subredditCount">0</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h3 class="text-sm text-gray-600">Total Posts in Library</h3>
+                        <p class="text-2xl font-semibold" id="totalPosts">0</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h3 class="text-sm text-gray-600">Downloaded Posts</h3>
+                        <p class="text-2xl font-semibold" id="totalDownloaded">0</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <h3 class="text-sm text-gray-600">Total Library Size</h3>
+                        <p class="text-2xl font-semibold" id="totalSize">0 MB</p>
+                    </div>
+                </div>
+
+                <!-- NSFW Mode Toggle -->
+                <div class="mb-4 bg-white p-6 rounded-lg shadow">
+                    <div class="flex items-center justify-between">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="nsfwMode" class="form-checkbox h-5 w-5 text-blue-600">
+                            <span class="ml-2 text-gray-700">Enable NSFW Mode</span>
+                        </label>
+                        <span class="text-sm text-gray-500" id="nsfwModeStatus"></span>
+                    </div>
+                </div>
+
+                <!-- Worker Controls -->
+                <div class="mb-4 bg-white p-6 rounded-lg shadow">
+                    <div class="flex items-center justify-between">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="metadataWorker" class="form-checkbox h-5 w-5 text-blue-600">
+                            <span class="ml-2 text-gray-700">Enable Metadata Worker</span>
+                        </label>
+                        <span class="text-sm text-gray-500" id="metadataWorkerStatus">Worker Disabled</span>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="mediaWorker" class="form-checkbox h-5 w-5 text-blue-600">
+                            <span class="ml-2 text-gray-700">Enable Media Worker</span>
+                        </label>
+                        <span class="text-sm text-gray-500" id="mediaWorkerStatus">Worker Disabled</span>
+                    </div>
+                    
+                    <div class="flex items-center justify-between">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="commentWorker" class="form-checkbox h-5 w-5 text-blue-600">
+                            <span class="ml-2 text-gray-700">Enable Comment Worker</span>
+                        </label>
+                        <span class="text-sm text-gray-500" id="commentWorkerStatus">Worker Disabled</span>
+                    </div>
+                </div>
+
+                <!-- Subreddit Selection -->
+                <div class="mb-8 bg-white p-6 rounded-lg shadow">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Add Subreddit</label>
+                    <select id="subredditSelect" class="w-full px-4 py-2 rounded border">
+                        <option></option>
+                    </select>
+                    <p class="mt-2 text-sm text-gray-500">
+                        Search for a subreddit or type its exact name
+                    </p>
+                </div>
+
+                <!-- Subreddit Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="subreddit-list">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/scripts.js"></script>
+</body>
+</html>
