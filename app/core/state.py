@@ -1,3 +1,5 @@
+# app/core/state.py
+
 import logging
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
