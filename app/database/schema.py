@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS posts (
     comment_fetch_attempts INTEGER DEFAULT 0,
     last_comment_failure TEXT DEFAULT NULL,
     last_status_check INTEGER,
+    last_batch_check INTEGER DEFAULT 0,
     metadata JSON,
     FOREIGN KEY(subreddit) REFERENCES subreddits(name)
 );
@@ -167,6 +168,7 @@ CREATE INDEX IF NOT EXISTS idx_posts_type ON posts(post_type);
 CREATE INDEX IF NOT EXISTS idx_posts_downloaded ON posts(downloaded);
 CREATE INDEX IF NOT EXISTS idx_posts_media_status ON posts(media_status);
 CREATE INDEX IF NOT EXISTS idx_posts_comment_status ON posts(comment_fetch_attempts, expected_comment_count);
+CREATE INDEX IF NOT EXISTS idx_posts_batch_check ON posts(last_batch_check);
 CREATE INDEX IF NOT EXISTS idx_posts_status_check ON posts(last_status_check);
 CREATE INDEX IF NOT EXISTS idx_post_media_post ON post_media(post_id);
 CREATE INDEX IF NOT EXISTS idx_post_media_downloaded ON post_media(downloaded);
@@ -189,7 +191,6 @@ CREATE INDEX IF NOT EXISTS idx_media_status ON post_media(media_status, download
 INSERT OR REPLACE INTO config (key, value, description, updated_at) VALUES
     ('nsfw_mode', 'false', 'Whether NSFW content is enabled', CAST(strftime('%s', 'now') AS INTEGER)),
     ('batch_size', '50', 'Number of posts to process in each batch', CAST(strftime('%s', 'now') AS INTEGER)),
-    ('batch_delay', '300', 'Delay in seconds between batches', CAST(strftime('%s', 'now') AS INTEGER)),
     ('auto_discover_enabled', 'true', 'Whether to automatically discover and archive new subreddits', CAST(strftime('%s', 'now') AS INTEGER)),
     ('min_subscribers', '10000', 'Minimum subscriber count for auto-discovery', CAST(strftime('%s', 'now') AS INTEGER)),
     ('download_comments', 'true', 'Whether to download comments for posts', CAST(strftime('%s', 'now') AS INTEGER)),

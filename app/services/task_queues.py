@@ -263,27 +263,112 @@ class TaskQueue:
                 raise
 
     async def _add_pending_media_tasks(self):
-        """Add pending media downloads to queue"""
-        async with self.db_pool.connection() as db:
-            cursor = await db.execute("""
-                SELECT name FROM subreddits 
-                WHERE status = 'ready'
-                ORDER BY RANDOM()
-                LIMIT 1
-            """)
-            subreddit = await cursor.fetchone()
-            
-            if subreddit:
-                pending = await self.db_pool.get_pending_downloads(subreddit[0], limit=50)
-                for post in pending:
+        """Add pending media downloads to queue using a round-robin approach"""
+        try:
+            async with self.db_pool.connection() as db:
+                # First get all ready subreddits with their download stats
+                cursor = await db.execute("""
+                    WITH subreddit_stats AS (
+                        SELECT 
+                            s.name,
+                            COUNT(DISTINCT p.id) as total_posts,
+                            COUNT(DISTINCT CASE WHEN p.downloaded = 1 THEN p.id END) as downloaded_count,
+                            COALESCE(MAX(p.last_batch_check), 0) as last_batch_check
+                        FROM subreddits s
+                        LEFT JOIN posts p ON s.name = p.subreddit
+                        WHERE s.status = 'ready'
+                        GROUP BY s.name
+                        HAVING total_posts > downloaded_count  -- Only include subreddits with pending downloads
+                    )
+                    SELECT 
+                        name,
+                        total_posts,
+                        downloaded_count,
+                        last_batch_check,
+                        ROUND(CAST(downloaded_count AS FLOAT) / NULLIF(total_posts, 0) * 100, 2) as completion_percentage
+                    FROM subreddit_stats
+                    ORDER BY 
+                        CASE 
+                            WHEN last_batch_check = 0 THEN 0  -- Prioritize newly added subreddits
+                            ELSE completion_percentage 
+                        END ASC,
+                        last_batch_check ASC
+                    LIMIT 1
+                """)
+                
+                subreddit = await cursor.fetchone()
+                if not subreddit:
+                    return
+
+                # Get pending posts for the selected subreddit
+                cursor = await db.execute("""
+                    SELECT p.*, 
+                        GROUP_CONCAT(m.media_url) as media_urls,
+                        GROUP_CONCAT(m.media_type) as media_types,
+                        GROUP_CONCAT(m.position) as positions
+                    FROM posts p
+                    LEFT JOIN post_media m ON p.id = m.post_id
+                    WHERE p.subreddit = ?
+                    AND p.downloaded = 0 
+                    AND p.error IS NULL
+                    AND (
+                        EXISTS (
+                            SELECT 1 FROM post_media 
+                            WHERE post_id = p.id AND media_url IS NOT NULL
+                        )
+                        OR p.post_type IN ('image', 'video', 'gallery')
+                    )
+                    GROUP BY p.id
+                    ORDER BY p.score DESC
+                    LIMIT ?
+                """, (subreddit[0], self.batch_size))
+
+                posts = []
+                current_time = int(time.time())
+                
+                async for row in cursor:
+                    post_dict = dict(row)
+                    # Process media items
+                    if post_dict.get('media_urls'):
+                        urls = post_dict['media_urls'].split(',')
+                        types = post_dict['media_types'].split(',') if post_dict.get('media_types') else ['unknown'] * len(urls)
+                        positions = post_dict['positions'].split(',') if post_dict.get('positions') else range(len(urls))
+                        
+                        post_dict['media_items'] = [
+                            {
+                                'url': url,
+                                'media_type': mtype,
+                                'position': int(pos)
+                            }
+                            for url, mtype, pos in zip(urls, types, positions)
+                            if url  # Only include non-empty URLs
+                        ]
+                    posts.append(post_dict)
+
+                # Update last batch check time for this subreddit
+                await db.execute("""
+                    UPDATE posts 
+                    SET last_batch_check = ? 
+                    WHERE subreddit = ? AND downloaded = 0
+                """, (current_time, subreddit[0]))
+                await db.commit()
+
+                # Add posts to queue
+                for post in posts:
                     await self.queue.put(post)
-                    #logging.info(f"Added media task for post {post['id']} from r/{post['subreddit']}")
+                    logging.debug(f"Added media task for post {post['id']} from r/{post['subreddit']}")
+
+                if posts:
+                    logging.info(f"Added batch of {len(posts)} posts from r/{subreddit[0]} " 
+                            f"({subreddit[4]}% complete) to download queue")
+
+        except Exception as e:
+            logging.error(f"Error adding pending media tasks: {e}", exc_info=True)
 
     async def _process_media_download(self, task_data: Dict):
         """Process a media download task"""
         from app.downloader import downloader  # Import here to avoid circular imports
         
-        #logging.info(f"Processing media download for post {task_data['id']}")
         post_id = task_data['id']
         subreddit = task_data['subreddit']
         
