@@ -2,8 +2,8 @@
 
 import time
 import aiohttp
-from app.utils import RateLimiter
-from app.version import USER_AGENT
+from app.core.utils import RateLimiter
+from app.core.version import USER_AGENT
 
 class RedditClient:
     def __init__(self):

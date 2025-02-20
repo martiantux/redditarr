@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 #from datetime import datetime
 from .task_queues import TaskQueue, TaskType
 from app.clients import ClientManager
-from ..utils import PathManager
+from ..core.paths import PathManager
 
 class MetadataManager:
     """

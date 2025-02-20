@@ -9,15 +9,14 @@ services:
       - ./metadata:/config
       # Store downloaded media files
       - ./media:/media
-      # For development testing
-      - ./app:/app/app
-      - ./static:/app/static
     environment:
       - REDDIT_CLIENT_ID
       - REDDIT_CLIENT_SECRET
       - REDDIT_USERNAME
       - REDDIT_PASSWORD
       - TZ=${TZ:-UTC}
+      - PUID=1000
+      - PGID=1000
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/api/health"]

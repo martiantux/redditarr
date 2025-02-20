@@ -11,7 +11,7 @@ import json
 import time
 from datetime import datetime
 from .schema import DB_SCHEMA
-from ..utils import PathManager
+from ..core.paths import PathManager
 
 class DatabasePool:
     def __init__(self, database_path: str, max_connections: int = 5):

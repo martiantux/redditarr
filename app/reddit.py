@@ -11,8 +11,8 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 from dotenv import load_dotenv
-from .utils import RateLimiter
-from app.version import USER_AGENT
+from .core.utils import RateLimiter
+from app.core.version import USER_AGENT
 from functools import lru_cache
 
 load_dotenv()
@@ -81,8 +81,6 @@ class RedditAPI:
 
             if not gif_id:
                 return None, f"Could not extract RedGifs ID from URL: {url}"
-
-            #logging.info(f"Extracted RedGifs ID: {gif_id} from URL: {url}")
 
             # Get token
             await self.redgifs_limiter.acquire()

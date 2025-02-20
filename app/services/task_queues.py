@@ -9,7 +9,7 @@ from collections import deque
 from typing import Dict, Any
 from enum import Enum
 from app.clients import ClientManager
-from app.utils import RateLimiter
+from app.core.utils import RateLimiter
 
 class TaskType(Enum):
     MEDIA_DOWNLOAD = "media_download"

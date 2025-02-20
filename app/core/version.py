@@ -1,4 +1,4 @@
-# app/version.py
+# app/core/version.py
 
 VERSION = "0.5.0"
 USER_AGENT = f"Redditarr/{VERSION} (Offline Content Archival Tool)"

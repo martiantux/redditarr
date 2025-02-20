@@ -9,9 +9,9 @@ import hashlib
 from pathlib import Path
 from typing import Any, Optional, Dict, Tuple
 import json
-from app.version import USER_AGENT
-
-from app.utils import RateLimiter, PathManager
+from app.core.version import USER_AGENT
+from app.core.paths import PathManager
+from app.core.utils import RateLimiter
 
 class Downloader:
     def __init__(self):
@@ -333,7 +333,6 @@ class Downloader:
 
     async def download_file(self, url: str, save_path: str, service: str = 'reddit') -> Tuple[bool, Optional[str]]:
         await self.ensure_initialized()
-        #logging.info(f"Starting download from {url} ({service} service)")
         
         try:
             # Handle discontinued services first
@@ -361,7 +360,6 @@ class Downloader:
                 await self.reddit_limiter.acquire()
 
             async with self.session.get(url) as response:
-                #logging.info(f"Download response status: {response.status} for {url}")
                 
                 # Handle common error responses
                 if response.status == 404:
@@ -377,7 +375,6 @@ class Downloader:
                 
                 content_length = int(response.headers.get('content-length', 0))
                 content_type = response.headers.get('content-type', '').lower()
-                #logging.info(f"Content length: {content_length} bytes, type: {content_type} for {url}")
                 
                 # Handle known error cases
                 if service == 'imgur' and content_length == 503:
@@ -392,7 +389,6 @@ class Downloader:
                     async for chunk in response.content.iter_chunked(8192):
                         f.write(chunk)
                         bytes_written += len(chunk)
-                    #logging.info(f"Wrote {bytes_written} bytes to {save_path}")
 
                 # Post-download validation
                 final_size = os.path.getsize(save_path)
@@ -410,7 +406,6 @@ class Downloader:
                     os.remove(save_path)
                     return False, error
 
-                #logging.info(f"Successfully downloaded {url} to {save_path}")
                 return True, None
 
         except Exception as e:
@@ -439,7 +434,6 @@ class Downloader:
                     return None
                 
                 if video_url:
-                    #logging.info(f"Retrieved actual video URL from RedGifs: {video_url}")
                     return video_url
                 return None
 
