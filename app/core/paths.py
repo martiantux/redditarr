@@ -9,12 +9,12 @@ from typing import Union
 class PathManager:
     """Centralizes all path handling logic for media files, metadata, and temporary storage."""
     
-    def __init__(self, base_dir: str = "."):
+    def __init__(self, base_dir: str = "/config"):
         self.base_dir = Path(base_dir)
-        self.media_dir = self.base_dir / "media"
+        self.media_dir = Path("/media")
         self.temp_dir = self.media_dir / "temp"
-        self.metadata_dir = self.base_dir / "metadata"
-        self.static_dir = self.base_dir / "static"
+        self.metadata_dir = self.base_dir
+        self.static_dir = Path("/app/static")
         
         # Set up directory structure
         self._initialize_directories()

@@ -6,7 +6,7 @@ services:
       - "${PORT:-8481}:80"
     volumes:
       # Store database and application state
-      - ./metadata:/config
+      - ./appdata:/config
       # Store downloaded media files
       - ./media:/media
     environment:

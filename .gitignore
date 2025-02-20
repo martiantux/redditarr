@@ -37,6 +37,8 @@ docker-compose.override.yml
 *.db
 media/*
 !media/.gitkeep
+appdata/*
+!appdata/.gitkeep
 metadata/*
 !metadata/.gitkeep
 *.log

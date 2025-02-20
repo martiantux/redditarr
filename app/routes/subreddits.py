@@ -305,17 +305,16 @@ async def get_subreddit_posts(
     subreddit: str, 
     limit: int = 100, 
     offset: int = 0, 
-    sort_by: str = "score", 
-    sort_order: str = "DESC",
+    sort: str = "score", 
     view_mode: str = "reddit"
 ):
     valid_sorts = {
-        "score": "score",
-        "new": "created_utc",
+        "score": "p.score DESC",
+        "new": "p.created_utc DESC",
         "random": "RANDOM()"
     }
     
-    sort_field = valid_sorts.get(sort_by, "score")
+    sort_field = valid_sorts.get(sort, "p.score DESC")
     
     subreddit = subreddit.lower()
 
@@ -352,7 +351,7 @@ async def get_subreddit_posts(
 
         query += f"""
             GROUP BY p.id
-            ORDER BY {sort_field} {sort_order}
+            ORDER BY {sort_field}
             LIMIT ? OFFSET ?
         """
 

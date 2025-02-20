@@ -38,8 +38,8 @@ ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
 # Create app directories
-RUN mkdir -p /app /config /media /metadata && \
-    chown -R app:app /app /config /media /metadata
+RUN mkdir -p /app /config /media && \
+    chown -R app:app /app /config /media
 
 # Set working directory and switch to non-root user
 WORKDIR /app
@@ -52,7 +52,7 @@ COPY --chown=app:app . .
 EXPOSE 80
 
 # Volume configuration
-VOLUME ["/config", "/media", "/metadata"]
+VOLUME ["/config", "/media"]
 
 # Health check
 HEALTHCHECK --interval=60s --timeout=30s --start-period=30s --retries=5 \

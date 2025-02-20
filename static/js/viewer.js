@@ -189,6 +189,11 @@ class SubredditViewer {
             const sortSelector = document.getElementById('sort-type');
             sortSelector.value = this.sortType;
             sortSelector.addEventListener('change', async (e) => {
+                const sortMap = {
+                    'score': 'score',
+                    'new': 'new',
+                    'random': 'random'
+                };
                 this.sortType = e.target.value;
                 localStorage.setItem('preferredSort', this.sortType);
                 await this.loadPosts();
@@ -368,9 +373,7 @@ class SubredditViewer {
     renderSinglePost(post) {
         const hasMedia = post.media_items && post.media_items.length > 0;
         const mediaItem = hasMedia ? post.media_items[0] : null;
-        const mediaPath = mediaItem?.download_path ? 
-            (mediaItem.download_path.startsWith('/') ? mediaItem.download_path : `/${mediaItem.download_path}`) : 
-            '';
+        const mediaPath = mediaItem?.download_path || '';
     
         return `
             <div class="single-view-post" data-post-id="${post.id}">
