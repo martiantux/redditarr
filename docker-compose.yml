@@ -3,20 +3,23 @@ services:
     build: .
     container_name: redditarr
     ports:
+      # Web UI port mapping - can be changed with PORT environment variable
       - "${PORT:-8481}:80"
     volumes:
       # Store database and application state
-      - ./appdata:/config
+      - ./metadata:/app/metadata
       # Store downloaded media files
-      - ./media:/media
+      - ./media:/app/media
     environment:
+      # Reddit API credentials (from .env file)
       - REDDIT_CLIENT_ID
       - REDDIT_CLIENT_SECRET
       - REDDIT_USERNAME
       - REDDIT_PASSWORD
+      # Container configuration
       - TZ=${TZ:-UTC}
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/api/health"]
@@ -24,9 +27,3 @@ services:
       timeout: 30s      # Allow more time for health check
       retries: 5        # More retries before marking unhealthy
       start_period: 30s # Give more time for initial startup
-    deploy:
-      resources:
-        limits:
-          memory: ${MEMORY_LIMIT:-1G}
-        reservations:
-          memory: ${MEMORY_MIN:-256M}

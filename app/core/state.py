@@ -45,9 +45,9 @@ class ApplicationConfig:
 
 class ApplicationState:
     def __init__(self):
-        self.base_dir = Path("/config")
+        self.base_dir = Path("/app/metadata")
         self.db_dir = self.base_dir / "db"
-        self.media_dir = Path("/media")
+        self.media_dir = Path("/app/media")
         self.temp_dir = self.media_dir / "temp"
         self.db_path = self.db_dir / "metadata.db"
         

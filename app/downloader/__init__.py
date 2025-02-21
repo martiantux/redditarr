@@ -7,6 +7,7 @@ import aiohttp
 import asyncio
 import hashlib
 from pathlib import Path
+import shutil
 from typing import Any, Optional, Dict, Tuple
 import json
 from app.core.version import USER_AGENT
@@ -180,7 +181,13 @@ class Downloader:
                     continue
 
                 service_type = self._determine_service_type(media_url)
+                
+                # Get the filesystem path for file operations
                 final_path = self.path_manager.get_media_path(post['id'], media_url, subreddit, position=idx)
+                
+                # Get the URL path for storing in the database
+                url_path = self.path_manager.get_media_url_path(post['id'], media_url, subreddit, position=idx)
+                
                 temp_path = self.path_manager.get_temp_path(post['id'], position=idx)
 
                 success, error = await self.download_with_retry(media_url, temp_path, service_type)
@@ -192,7 +199,9 @@ class Downloader:
                         quick_hash = file_hash[:16]  # First 16 chars for quick matching
                         
                         os.makedirs(os.path.dirname(str(final_path)), exist_ok=True)
-                        os.rename(str(temp_path), str(final_path))
+                        
+                        shutil.copy2(str(temp_path), str(final_path))
+                        os.remove(str(temp_path))  # Clean up the temp file
                         
                         # Store file metadata including hashes
                         async with self.db_pool.connection() as db:
@@ -211,7 +220,7 @@ class Downloader:
                                 self._guess_mime_type(str(final_path))
                             ))
 
-                            # Update post_media record
+                            # Update post_media record with URL path for browser access
                             await db.execute("""
                                 UPDATE post_media 
                                 SET download_path = ?,
@@ -222,7 +231,7 @@ class Downloader:
                                     last_attempt = ?
                                 WHERE post_id = ? AND position = ?
                             """, (
-                                str(final_path),
+                                url_path,  # Store the URL path in the database
                                 int(time.time()),
                                 int(time.time()),
                                 post['id'],

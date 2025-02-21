@@ -327,7 +327,23 @@ class TaskQueue:
                 current_time = int(time.time())
                 
                 async for row in cursor:
-                    post_dict = dict(row)
+                    if hasattr(row, 'keys'):  # If it's a row object with keys
+                        post_dict = dict(row)
+                    else:  # If it's a tuple
+                        # Ensure db.row_factory is set before executing the query
+                        cursor = await db.execute("""
+                            SELECT p.*, 
+                                GROUP_CONCAT(m.media_url) as media_urls,
+                                GROUP_CONCAT(m.media_type) as media_types,
+                                GROUP_CONCAT(m.position) as positions
+                            FROM posts p
+                            LEFT JOIN post_media m ON p.id = m.post_id
+                            WHERE p.id = ?
+                            GROUP BY p.id
+                        """, (row[0],))
+                        post_dict = dict(await cursor.fetchone())
+
+
                     # Process media items
                     if post_dict.get('media_urls'):
                         urls = post_dict['media_urls'].split(',')

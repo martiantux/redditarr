@@ -78,11 +78,18 @@ class MediaManager {
     
         // Start loading the video
         if (video.dataset.src) {
-            console.log('Setting video source:', video.dataset.src);
-            video.src = video.dataset.src;
+            let src = video.dataset.src;
+            // Convert container paths to URL paths if needed
+            if (src.startsWith('/app/')) {
+                src = src.replace('/app', '');
+            }
+            // Ensure path starts with / if it's a relative path
+            if (!src.startsWith('/') && !src.startsWith('http')) {
+                src = `/${src}`;
+            }
+            console.log('Setting video source:', src);
+            video.src = src;
             video.load();
-        } else {
-            console.error('No video source found for:', postId);
         }
     }
 

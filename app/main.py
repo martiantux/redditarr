@@ -30,9 +30,9 @@ app = FastAPI(
 # Include router
 app.include_router(router)
 
-# Mount static directories
-app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/media", StaticFiles(directory="media"), name="media")
+# Mount static directories with absolute paths
+app.mount("/static", StaticFiles(directory="/app/static"), name="static")
+app.mount("/media", StaticFiles(directory="/app/media"), name="media")
 
 @app.get("/")
 async def read_root():

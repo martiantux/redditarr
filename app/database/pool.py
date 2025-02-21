@@ -123,6 +123,27 @@ class DatabasePool:
         base_path = Path('media') / subreddit
         os.makedirs(base_path, exist_ok=True)
         return str(base_path / f"{post_id}{ext}")
+    
+    def get_media_url_path(self, path_or_str) -> str:
+        """
+        Convert a Path object or string to a URL-friendly string with /media prefix.
+        This ensures all media paths in the database can be directly used as URLs.
+        """
+        # Convert Path object to string if needed
+        path_str = str(path_or_str)
+        
+        # If it already starts with /media, return as is
+        if path_str.startswith('/media/'):
+            return path_str
+            
+        # If it starts with /app/media, fix it
+        if path_str.startswith('/app/media/'):
+            return path_str.replace('/app/media/', '/media/')
+            
+        # Otherwise, assume it's a relative path and prepend /media/
+        # Make sure there are no double slashes
+        path_str = path_str.lstrip('/')
+        return f"/media/{path_str}"
 
     async def store_media_metadata(self, file_hash: str, post_id: str, file_path: str, post: Dict):
         """Store media file metadata in the database."""

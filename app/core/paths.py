@@ -3,18 +3,19 @@
 import os
 import logging
 from pathlib import Path
+import time
 import mimetypes
 from typing import Union
 
 class PathManager:
     """Centralizes all path handling logic for media files, metadata, and temporary storage."""
     
-    def __init__(self, base_dir: str = "/config"):
+    def __init__(self, base_dir: str = "/app"):
         self.base_dir = Path(base_dir)
-        self.media_dir = Path("/media")
+        self.media_dir = self.base_dir / "media"
         self.temp_dir = self.media_dir / "temp"
-        self.metadata_dir = self.base_dir
-        self.static_dir = Path("/app/static")
+        self.metadata_dir = self.base_dir / "metadata"
+        self.static_dir = self.base_dir / "static"
         
         # Set up directory structure
         self._initialize_directories()
@@ -54,15 +55,27 @@ class PathManager:
         """
         Generates the appropriate path for storing media content.
         """
+        # For filesystem operations, use the actual path
         subreddit_dir = self.media_dir / subreddit
         extension = self._determine_extension(media_url)
         filename = f"{post_id}_{position}{extension}"
-        full_path = subreddit_dir / filename
         
         # Ensure directory exists
         subreddit_dir.mkdir(parents=True, exist_ok=True)
         
-        return full_path
+        # Return the actual filesystem path for file operations
+        return subreddit_dir / filename
+    
+    def get_media_url_path(self, post_id: str, media_url: str, subreddit: str, 
+                        position: int = 0) -> str:
+        """
+        Returns a URL-friendly path for the media file.
+        """
+        extension = self._determine_extension(media_url)
+        filename = f"{post_id}_{position}{extension}"
+        
+        # Return URL path (without the /app prefix)
+        return f"/media/{subreddit}/{filename}"
     
     def get_temp_path(self, post_id: str, position: int = 0) -> Path:
         """
