@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS posts (
     media_status TEXT DEFAULT 'pending' CHECK(
         media_status IN (
             'pending', 'downloaded', 'permanently_removed',
-            'temporarily_unavailable', 'error'
+            'temporarily_unavailable', 'error', 'duplicate'
         )
     ),
     last_comment_update INTEGER,
@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS post_media (
     media_status TEXT DEFAULT 'pending' CHECK(
         media_status IN (
             'pending', 'downloaded', 'permanently_removed',
-            'temporarily_unavailable', 'error'
+            'temporarily_unavailable', 'error', 'duplicate'
         )
     ),
     FOREIGN KEY(post_id) REFERENCES posts(id) ON DELETE CASCADE
@@ -135,6 +135,7 @@ CREATE TABLE IF NOT EXISTS media_deduplication (
     quick_hash TEXT NOT NULL,
     canonical_path TEXT NOT NULL,
     first_seen_timestamp INTEGER NOT NULL,
+    first_seen_post_id TEXT,
     total_size INTEGER NOT NULL,
     mime_type TEXT,
     duplicate_count INTEGER DEFAULT 0
@@ -194,8 +195,9 @@ INSERT OR REPLACE INTO config (key, value, description, updated_at) VALUES
     ('auto_discover_enabled', 'true', 'Whether to automatically discover and archive new subreddits', CAST(strftime('%s', 'now') AS INTEGER)),
     ('min_subscribers', '10000', 'Minimum subscriber count for auto-discovery', CAST(strftime('%s', 'now') AS INTEGER)),
     ('download_comments', 'true', 'Whether to download comments for posts', CAST(strftime('%s', 'now') AS INTEGER)),
-    ('comment_depth', '10', 'Maximum depth of comments to download', CAST(strftime('%s', 'now') AS INTEGER));
-
+    ('comment_depth', '10', 'Maximum depth of comments to download', CAST(strftime('%s', 'now') AS INTEGER)),
+    ('subreddit_duplicate_strategy', 'highest_voted', 'Strategy for handling duplicate media within a subreddit (highest_voted or oldest)', CAST(strftime('%s', 'now') AS INTEGER));
+    
 -- Initialize worker status
 INSERT OR IGNORE INTO worker_status (worker_type, enabled, last_updated) VALUES
     ('media', 0, CAST(strftime('%s', 'now') AS INTEGER)),

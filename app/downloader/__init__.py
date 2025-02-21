@@ -5,6 +5,7 @@ import logging
 import time
 import aiohttp
 import asyncio
+import aiosqlite
 import hashlib
 from pathlib import Path
 import shutil
@@ -131,6 +132,188 @@ class Downloader:
             
         return 'unknown'
 
+    async def _check_for_duplicates(self, file_hash: str, quick_hash: str, subreddit: str, post_id: str) -> Tuple[bool, Optional[Dict]]:
+        """Check if this media file already exists in the same subreddit."""
+        try:
+            async with self.db_pool.connection() as db:
+                # First check by quick hash (faster)
+                db.row_factory = aiosqlite.Row
+                cursor = await db.execute("""
+                    SELECT d.canonical_hash, d.canonical_path, d.first_seen_post_id, 
+                        m.download_path, p.id, p.score, p.created_utc
+                    FROM media_deduplication d
+                    JOIN post_media m ON m.post_id = d.first_seen_post_id
+                    JOIN posts p ON m.post_id = p.id
+                    WHERE d.quick_hash = ?
+                    AND p.subreddit = ?
+                    AND p.id != ?
+                """, (quick_hash, subreddit, post_id))
+                
+                potential_match = await cursor.fetchone()
+                
+                if not potential_match:
+                    return False, None
+                    
+                # If quick hash matches, verify with full hash
+                if potential_match and potential_match['canonical_hash'] == file_hash:
+                    return True, dict(potential_match)
+                    
+            return False, None
+        except Exception as e:
+            logging.error(f"Error checking for duplicates: {e}")
+            return False, None
+
+    async def _handle_duplicate(self, current_post: Dict, canonical_post: Dict, temp_path: str, url_path: str, position: int, file_hash: str):
+        """Handle duplicate media according to chosen strategy."""
+        try:
+            # Get deduplication strategy from config
+            async with self.db_pool.connection() as db:
+                cursor = await db.execute("SELECT value FROM config WHERE key = 'subreddit_duplicate_strategy'")
+                result = await cursor.fetchone()
+                strategy = result[0] if result else 'highest_voted'
+            
+            # Determine which post to keep based on strategy
+            keep_current = False
+            if strategy == 'highest_voted':
+                keep_current = current_post.get('score', 0) > canonical_post.get('score', 0)
+            elif strategy == 'oldest':
+                keep_current = current_post.get('created_utc', 0) < canonical_post.get('created_utc', 0)
+            
+            if keep_current:
+                # Keep the current post's media and replace the canonical one
+                canonical_path = canonical_post.get('canonical_path')
+                
+                # Replace the file
+                if canonical_path and os.path.exists(canonical_path):
+                    os.remove(canonical_path)  # Remove old file
+                
+                new_final_path = self.path_manager.get_media_path(
+                    current_post['id'], 
+                    current_post.get('media_url', ''), 
+                    current_post['subreddit'], 
+                    position=position
+                )
+                
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(str(new_final_path)), exist_ok=True)
+                
+                # Move temp file to final location
+                shutil.copy2(str(temp_path), str(new_final_path))
+                
+                # Update database to reflect new canonical file
+                async with self.db_pool.connection() as db:
+                    # Update media_deduplication to point to new canonical file
+                    await db.execute("""
+                        UPDATE media_deduplication
+                        SET canonical_path = ?,
+                            first_seen_post_id = ?,
+                            total_size = ?
+                        WHERE canonical_hash = ?
+                    """, (
+                        str(new_final_path),
+                        current_post['id'],
+                        os.path.getsize(str(temp_path)),
+                        file_hash
+                    ))
+                    
+                    # Update all post_media records that pointed to old canonical file
+                    await db.execute("""
+                        UPDATE post_media
+                        SET download_path = ?
+                        WHERE download_path = ? AND post_id != ?
+                    """, (
+                        url_path,
+                        canonical_post.get('download_path'),
+                        current_post['id']
+                    ))
+                    
+                    # Update the current post's media record
+                    await db.execute("""
+                        UPDATE post_media 
+                        SET download_path = ?,
+                            downloaded = 1,
+                            downloaded_at = ?,
+                            error = NULL,
+                            media_status = 'downloaded',
+                            last_attempt = ?
+                        WHERE post_id = ? AND position = ?
+                    """, (
+                        url_path,
+                        int(time.time()),
+                        int(time.time()),
+                        current_post['id'],
+                        position
+                    ))
+                    
+                    # Mark the previous canonical post as a duplicate if it wasn't already
+                    await db.execute("""
+                        INSERT INTO media_links
+                        (post_id, canonical_hash, symlink_path, created_timestamp, is_crosspost)
+                        VALUES (?, ?, ?, ?, ?)
+                        ON CONFLICT DO NOTHING
+                    """, (
+                        canonical_post['id'],
+                        file_hash,
+                        canonical_post.get('download_path'),
+                        int(time.time()),
+                        0  # Not a crosspost, same subreddit
+                    ))
+                    
+                logging.info(f"Replaced canonical file for hash {file_hash[:8]} with higher {strategy} post {current_post['id']}")
+                    
+            else:
+                # Keep the canonical post's media, discard the temp file
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    
+                # Mark current post as a duplicate
+                async with self.db_pool.connection() as db:
+                    # Record the link to the canonical file
+                    await db.execute("""
+                        INSERT INTO media_links
+                        (post_id, canonical_hash, symlink_path, created_timestamp, is_crosspost)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (
+                        current_post['id'],
+                        file_hash,
+                        url_path,
+                        int(time.time()),
+                        0  # Not a crosspost, same subreddit
+                    ))
+                    
+                    # Update post_media to point to canonical file
+                    await db.execute("""
+                        UPDATE post_media 
+                        SET download_path = ?,
+                            downloaded = 1,
+                            downloaded_at = ?,
+                            error = NULL,
+                            media_status = 'duplicate',
+                            last_attempt = ?
+                        WHERE post_id = ? AND position = ?
+                    """, (
+                        canonical_post.get('download_path'),  # Use canonical media path
+                        int(time.time()),
+                        int(time.time()),
+                        current_post['id'],
+                        position
+                    ))
+                    
+                    # Update the deduplication record to increment duplicate count
+                    await db.execute("""
+                        UPDATE media_deduplication
+                        SET duplicate_count = duplicate_count + 1
+                        WHERE canonical_hash = ?
+                    """, (file_hash,))
+                    
+                logging.info(f"Marked post {current_post['id']} as duplicate of {canonical_post['id']} based on {strategy} strategy")
+                
+        except Exception as e:
+            logging.error(f"Error handling duplicate: {e}")
+            # Clean up temp file if it exists
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
     async def process_post(self, post: Dict, subreddit: str) -> bool:
         await self.ensure_initialized()
 
@@ -198,46 +381,56 @@ class Downloader:
                         file_hash = self._calculate_file_hash(temp_path)
                         quick_hash = file_hash[:16]  # First 16 chars for quick matching
                         
-                        os.makedirs(os.path.dirname(str(final_path)), exist_ok=True)
+                        # Check for duplicates in the same subreddit
+                        is_duplicate, canonical_post = await self._check_for_duplicates(file_hash, quick_hash, subreddit, post['id'])
                         
-                        shutil.copy2(str(temp_path), str(final_path))
-                        os.remove(str(temp_path))  # Clean up the temp file
-                        
-                        # Store file metadata including hashes
-                        async with self.db_pool.connection() as db:
-                            # Store in media_deduplication table
-                            await db.execute("""
-                                INSERT INTO media_deduplication 
-                                (canonical_hash, quick_hash, canonical_path, first_seen_timestamp,
-                                total_size, mime_type)
-                                VALUES (?, ?, ?, ?, ?, ?)
-                            """, (
-                                file_hash,
-                                quick_hash,
-                                str(final_path),
-                                int(time.time()),
-                                os.path.getsize(str(final_path)),
-                                self._guess_mime_type(str(final_path))
-                            ))
-
-                            # Update post_media record with URL path for browser access
-                            await db.execute("""
-                                UPDATE post_media 
-                                SET download_path = ?,
-                                    downloaded = 1,
-                                    downloaded_at = ?,
-                                    error = NULL,
-                                    media_status = 'downloaded',
-                                    last_attempt = ?
-                                WHERE post_id = ? AND position = ?
-                            """, (
-                                url_path,  # Store the URL path in the database
-                                int(time.time()),
-                                int(time.time()),
-                                post['id'],
-                                idx
-                            ))
+                        if is_duplicate:
+                            # Handle duplicate according to strategy
+                            logging.warning(f"found duplicate for post {post['id']}")
+                            await self._handle_duplicate(post, canonical_post, temp_path, url_path, idx, file_hash)
+                        else:
+                            # Not a duplicate, proceed as usual
+                            os.makedirs(os.path.dirname(str(final_path)), exist_ok=True)
                             
+                            shutil.copy2(str(temp_path), str(final_path))
+                            os.remove(str(temp_path))  # Clean up the temp file
+                            
+                            # Store file metadata including hashes
+                            async with self.db_pool.connection() as db:
+                                # Store in media_deduplication table
+                                await db.execute("""
+                                    INSERT INTO media_deduplication 
+                                    (canonical_hash, quick_hash, canonical_path, first_seen_timestamp,
+                                    total_size, mime_type, first_seen_post_id)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                                """, (
+                                    file_hash,
+                                    quick_hash,
+                                    str(final_path),
+                                    int(time.time()),
+                                    os.path.getsize(str(final_path)),
+                                    self._guess_mime_type(str(final_path)),
+                                    post['id']
+                                ))
+
+                                # Update post_media record with URL path for browser access
+                                await db.execute("""
+                                    UPDATE post_media 
+                                    SET download_path = ?,
+                                        downloaded = 1,
+                                        downloaded_at = ?,
+                                        error = NULL,
+                                        media_status = 'downloaded',
+                                        last_attempt = ?
+                                    WHERE post_id = ? AND position = ?
+                                """, (
+                                    url_path,  # Store the URL path in the database
+                                    int(time.time()),
+                                    int(time.time()),
+                                    post['id'],
+                                    idx
+                                ))
+                                
                     except Exception as e:
                         logging.error(f"Error processing successful download for post {post['id']}, item {idx}: {e}")
                         all_success = False
