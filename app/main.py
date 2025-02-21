@@ -38,10 +38,6 @@ app.mount("/media", StaticFiles(directory="/app/media"), name="media")
 async def read_root():
     return FileResponse("static/index.html")
 
-@app.get("/r/{subreddit}")
-async def serve_viewer(subreddit: str):
-    return FileResponse("static/viewer.html")
-
 @app.get("/api/health")
 async def health_check():
     return {"status": "healthy"}
