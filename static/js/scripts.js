@@ -98,14 +98,14 @@ async function initializeApp() {
         // Initialize subreddit select
         initializeSubredditSelect();
         
+        // Load worker status
+        await loadWorkerStatus();
+
         // Load initial data
         await fetchSubreddits();
         
         // Set up event listeners
         setupEventListeners();
-        
-        // Load worker status
-        await loadWorkerStatus();
         
     } catch (error) {
         console.error('Error initializing app:', error);
@@ -293,19 +293,42 @@ async function toggleNSFWMode(enabled) {
 async function loadWorkerStatus() {
     try {
         const response = await fetch('/api/workers/status');
-        const status = await response.json();
+        if (!response.ok) {
+            throw new Error(`Failed to load worker status: ${response.status}`);
+        }
         
-        document.getElementById('mediaWorker').checked = status.media;
-        document.getElementById('mediaWorkerStatus').textContent = 
-            status.media ? 'Worker Enabled' : 'Worker Disabled';
-            
-        document.getElementById('commentWorker').checked = status.comments;
-        document.getElementById('commentWorkerStatus').textContent = 
-            status.comments ? 'Worker Enabled' : 'Worker Disabled';
-            
-        document.getElementById('metadataWorker').checked = status.metadata;
-        document.getElementById('metadataWorkerStatus').textContent = 
-            status.metadata ? 'Worker Enabled' : 'Worker Disabled';
+        const status = await response.json();
+        console.log("Worker status from server:", status); // Debug logging
+        
+        // Explicitly cast to boolean values 
+        const metadataEnabled = Boolean(status.metadata);
+        const mediaEnabled = Boolean(status.media);
+        const commentsEnabled = Boolean(status.comments);
+        
+        // Update metadata worker UI
+        const metadataCheckbox = document.getElementById('metadataWorker');
+        const metadataStatus = document.getElementById('metadataWorkerStatus');
+        if (metadataCheckbox && metadataStatus) {
+            metadataCheckbox.checked = metadataEnabled;
+            metadataStatus.textContent = metadataEnabled ? 'Worker Enabled' : 'Worker Disabled';
+        }
+        
+        // Update media worker UI
+        const mediaCheckbox = document.getElementById('mediaWorker');
+        const mediaStatus = document.getElementById('mediaWorkerStatus');
+        if (mediaCheckbox && mediaStatus) {
+            mediaCheckbox.checked = mediaEnabled;
+            mediaStatus.textContent = mediaEnabled ? 'Worker Enabled' : 'Worker Disabled';
+        }
+        
+        // Update comment worker UI
+        const commentCheckbox = document.getElementById('commentWorker');
+        const commentStatus = document.getElementById('commentWorkerStatus');
+        if (commentCheckbox && commentStatus) {
+            commentCheckbox.checked = commentsEnabled;
+            commentStatus.textContent = commentsEnabled ? 'Worker Enabled' : 'Worker Disabled';
+        }
+        
     } catch (error) {
         console.error('Error loading worker status:', error);
     }
@@ -345,18 +368,20 @@ async function toggleWorker(type, enabled) {
             body: JSON.stringify({ enabled })
         });
 
-        const data = await response.json();  // Get response data first
-
         if (!response.ok) {
+            const data = await response.json();
             throw new Error(data.detail || 'Failed to update worker status');
         }
 
+        const data = await response.json();
+        
+        // Update UI based on the server's response, not the checkbox state
         const statusElement = document.getElementById(`${type}WorkerStatus`);
         const checkbox = document.getElementById(`${type}Worker`);
         
-        if (statusElement && checkbox) {  // Add null checks
-            statusElement.textContent = enabled ? 'Worker Enabled' : 'Worker Disabled';
-            checkbox.checked = enabled;
+        if (statusElement && checkbox) {
+            statusElement.textContent = data.enabled ? 'Worker Enabled' : 'Worker Disabled';
+            checkbox.checked = data.enabled;
         }
 
     } catch (error) {
@@ -364,7 +389,7 @@ async function toggleWorker(type, enabled) {
         // Revert checkbox state on error
         const checkbox = document.getElementById(`${type}Worker`);
         if (checkbox) {
-            checkbox.checked = !checkbox.checked;
+            checkbox.checked = !enabled;
         }
         alert(`Failed to update ${type} worker status: ${error.message}`);
     }

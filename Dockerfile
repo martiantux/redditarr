@@ -51,7 +51,7 @@ if [ -n "${PUID}" ] && [ -n "${PGID}" ]; then\n\
   chown -R ${PUID}:${PGID} /app/metadata /app/media\n\
 fi\n\
 # Run the application\n\
-exec python -m uvicorn app.main:app --host 0.0.0.0 --port 80\n\
+exec python -m uvicorn app.main:app --host 0.0.0.0 --port 80 --reload\n\
 ' > /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Expose port

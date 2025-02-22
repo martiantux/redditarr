@@ -10,6 +10,8 @@ services:
       - ./metadata:/app/metadata
       # Store downloaded media files
       - ./media:/app/media
+      # For hot-reloading code, prob remove for prod releases?
+      - ./app:/app/app
     environment:
       # Reddit API credentials (from .env file)
       - REDDIT_CLIENT_ID

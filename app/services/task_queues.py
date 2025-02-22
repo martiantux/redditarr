@@ -8,6 +8,7 @@ from datetime import datetime
 from collections import deque
 from typing import Dict, Any
 from enum import Enum
+import aiosqlite
 from app.clients import ClientManager
 from app.core.utils import RateLimiter
 
@@ -266,6 +267,9 @@ class TaskQueue:
         """Add pending media downloads to queue using a round-robin approach"""
         try:
             async with self.db_pool.connection() as db:
+                # Always set row_factory to return dictionaries
+                db.row_factory = aiosqlite.Row
+                
                 # First get all ready subreddits with their download stats
                 cursor = await db.execute("""
                     WITH subreddit_stats AS (
@@ -321,34 +325,19 @@ class TaskQueue:
                     GROUP BY p.id
                     ORDER BY p.score DESC
                     LIMIT ?
-                """, (subreddit[0], self.batch_size))
+                """, (subreddit['name'], self.batch_size))
 
                 posts = []
                 current_time = int(time.time())
                 
                 async for row in cursor:
-                    if hasattr(row, 'keys'):  # If it's a row object with keys
-                        post_dict = dict(row)
-                    else:  # If it's a tuple
-                        # Ensure db.row_factory is set before executing the query
-                        cursor = await db.execute("""
-                            SELECT p.*, 
-                                GROUP_CONCAT(m.media_url) as media_urls,
-                                GROUP_CONCAT(m.media_type) as media_types,
-                                GROUP_CONCAT(m.position) as positions
-                            FROM posts p
-                            LEFT JOIN post_media m ON p.id = m.post_id
-                            WHERE p.id = ?
-                            GROUP BY p.id
-                        """, (row[0],))
-                        post_dict = dict(await cursor.fetchone())
-
-
+                    post_dict = dict(row)
+                    
                     # Process media items
                     if post_dict.get('media_urls'):
                         urls = post_dict['media_urls'].split(',')
                         types = post_dict['media_types'].split(',') if post_dict.get('media_types') else ['unknown'] * len(urls)
-                        positions = post_dict['positions'].split(',') if post_dict.get('positions') else range(len(urls))
+                        positions = post_dict['positions'].split(',') if post_dict.get('positions') else list(range(len(urls)))
                         
                         post_dict['media_items'] = [
                             {
@@ -366,7 +355,7 @@ class TaskQueue:
                     UPDATE posts 
                     SET last_batch_check = ? 
                     WHERE subreddit = ? AND downloaded = 0
-                """, (current_time, subreddit[0]))
+                """, (current_time, subreddit['name']))
                 await db.commit()
 
                 # Add posts to queue
@@ -375,8 +364,8 @@ class TaskQueue:
                     logging.debug(f"Added media task for post {post['id']} from r/{post['subreddit']}")
 
                 if posts:
-                    logging.info(f"Added batch of {len(posts)} posts from r/{subreddit[0]} " 
-                            f"({subreddit[4]}% complete) to download queue")
+                    logging.info(f"Added batch of {len(posts)} posts from r/{subreddit['name']} " 
+                            f"({subreddit['completion_percentage']}% complete) to download queue")
 
         except Exception as e:
             logging.error(f"Error adding pending media tasks: {e}", exc_info=True)

@@ -15,9 +15,9 @@ async def get_worker_status():
             cursor = await db.execute("SELECT worker_type, enabled FROM worker_status")
             status = dict(await cursor.fetchall())
             return {
-                "media": bool(status.get("media", 0)),
-                "comments": bool(status.get("comments", 0)),
-                "metadata": bool(status.get("metadata", 0))
+                "media": bool(int(status.get("media", 0))),
+                "comments": bool(int(status.get("comments", 0))),
+                "metadata": bool(int(status.get("metadata", 0)))
             }
     except Exception as e:
         logging.error(f"Error getting worker status: {e}", exc_info=True)
